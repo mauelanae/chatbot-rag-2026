@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environment
+venv/
+.venv/
+env/
+ENV/
+
+# Secrets -- JANGAN pernah commit file ini
+.env
+.env.*
+!.env.example
+
+# Uploads / data hasil runtime
+backend/uploads/
+backend/storage/
+*.faiss
+*.pkl
+*.npy
+
+# OS / editor
+.DS_Store
+.idea/

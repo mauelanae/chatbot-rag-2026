@@ -1,0 +1,18 @@
+# Dependensi Chatbot RAG
+# Versi di bawah = versi yang BENAR-BENAR terpasang di backend/venv (Python 3.15.1).
+# Pin lama (numpy 1.26.4, scikit-learn 1.4.2, dll) tidak punya wheel untuk
+# Python 3.15 sehingga `pip install -r requirements.txt` gagal build dari source.
+#
+# Install:
+#   python -m venv venv
+#   ./venv/bin/pip install -r requirements.txt
+
+flask==3.1.3
+flask-cors==6.0.5
+pypdf==7.0.1
+python-docx==1.2.0
+scikit-learn==1.9.1
+numpy==2.5.4
+sentence-transformers==6.2.0
+openai==3.49.0
+python-dotenv==1.2.4
