@@ -30,6 +30,7 @@ class DocumentProcessor:
 
     @staticmethod
     def chunk_text(text: str, chunk_size: int = 400, overlap: int = 50) -> list[str]:
+        #sumber materi
         """
         Memecah teks panjang menjadi beberapa chunks.
         Chunking penting agar KNN dapat menemukan bagian spesifik materi
