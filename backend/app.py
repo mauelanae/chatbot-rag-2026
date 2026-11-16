@@ -71,11 +71,12 @@ def chat():
 
     # [A + G] AUGMENTED & GENERATION: Masukkan materi ke prompt lalu generate jawaban
     # 2. LLM Generation via 9router
-    answer = llm_service.generate_answer(question, relevant_chunks)
+    result = llm_service.generate_answer(question, relevant_chunks)
     
     return jsonify({
         "question": question,
-        "answer": answer,
+        "answer": result.get("answer", ""),
+        "is_out_of_context": result.get("is_out_of_context", False),
         "retrieved_context_count": len(relevant_chunks)
     })
 if __name__ == "__main__":

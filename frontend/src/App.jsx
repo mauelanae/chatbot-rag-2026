@@ -11,25 +11,149 @@ import {
   User,
   Database,
   ArrowRight,
-  BookOpen
+  BookOpen,
+  AlertCircle
 } from 'lucide-react';
 import DatasetUploaderModal from './components/DatasetUploaderModal';
 
 const SUGGESTIONS = [
-  'Apa perbedaan komponen biotik dan abiotik?',
-  'Bagaimana cara memilah sampah organik dan anorganik?',
-  'Apa manfaat melakukan reboisasi?',
-  'Bagaimana cara menghemat energi di rumah?'
+  'Apa pengertian dan contoh penerapan PHBS di sekolah?',
+  'Apa perbedaan lingkungan alam dan lingkungan buatan?',
+  'Apa saja pembagian komponen biotik dan contoh abiotik?',
+  'Bagaimana upaya menjaga kelestarian lingkungan di rumah dan sekolah?'
 ];
 
-// Membersihkan simbol markdown mentah seperti ** atau ### agar teks bersih dan rapi
-const formatCleanText = (text) => {
-  if (!text) return '';
-  return text
-    .replaceAll('**', '')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/^\s*\*\s+/gm, '- ');
+// Helper untuk merender teks tebal (**teks**) dan menjaga spasi/inline text
+const renderInlineFormatted = (text, isAlert = false) => {
+  if (!text) return null;
+  const parts = [];
+  const regex = /\*\*(.*?)\*\*/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <strong
+        key={match.index}
+        className={`font-semibold ${isAlert ? 'text-amber-950 font-bold' : 'text-gray-900 font-bold'}`}
+      >
+        {match[1]}
+      </strong>
+    );
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return parts;
 };
+
+// Komponen perender pesan rapi: memisahkan paragraf, bullet points, dan numbered lists
+function FormattedMessage({ text, isAlert = false }) {
+  if (!text) return null;
+
+  // Bersihkan hashtag heading berlebih bila ada
+  const cleaned = text.replace(/^#{1,6}\s+/gm, '');
+  const lines = cleaned.split('\n');
+  const blocks = [];
+  let currentList = null;
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (currentList) {
+        blocks.push(currentList);
+        currentList = null;
+      }
+      return;
+    }
+
+    // Deteksi bullet point: - item atau * item atau • item
+    const bulletMatch = trimmed.match(/^[-*•]\s+(.*)$/);
+    // Deteksi numbered point: 1. item atau a. item
+    const numberMatch = trimmed.match(/^(\d+|[a-zA-Z])[\.)]\s+(.*)$/);
+
+    if (bulletMatch) {
+      if (!currentList || currentList.type !== 'bullet') {
+        if (currentList) blocks.push(currentList);
+        currentList = { type: 'bullet', items: [] };
+      }
+      currentList.items.push(bulletMatch[1]);
+    } else if (numberMatch) {
+      if (!currentList || currentList.type !== 'number') {
+        if (currentList) blocks.push(currentList);
+        currentList = { type: 'number', items: [] };
+      }
+      currentList.items.push({ num: numberMatch[1], content: numberMatch[2] });
+    } else {
+      if (currentList) {
+        blocks.push(currentList);
+        currentList = null;
+      }
+      blocks.push({ type: 'paragraph', content: trimmed });
+    }
+  });
+
+  if (currentList) blocks.push(currentList);
+
+  return (
+    <div className={`space-y-2.5 text-xs md:text-sm leading-relaxed ${isAlert ? 'text-amber-950' : 'text-gray-800'}`}>
+      {blocks.map((block, idx) => {
+        if (block.type === 'paragraph') {
+          return (
+            <p key={idx} className="leading-relaxed">
+              {renderInlineFormatted(block.content, isAlert)}
+            </p>
+          );
+        }
+        if (block.type === 'bullet') {
+          return (
+            <ul key={idx} className="space-y-1.5 my-1.5 pl-0.5">
+              {block.items.map((item, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full mt-2 shrink-0 ${
+                      isAlert ? 'bg-amber-600' : 'bg-emerald-500'
+                    }`}
+                  />
+                  <span className="flex-1 leading-relaxed">
+                    {renderInlineFormatted(item, isAlert)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        if (block.type === 'number') {
+          return (
+            <ol key={idx} className="space-y-1.5 my-1.5 pl-0.5">
+              {block.items.map((item, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span
+                    className={`inline-flex items-center justify-center font-bold px-1.5 py-0.5 rounded text-[11px] shrink-0 mt-0.5 ${
+                      isAlert
+                        ? 'bg-amber-200/80 text-amber-900'
+                        : 'bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-semibold'
+                    }`}
+                  >
+                    {item.num}.
+                  </span>
+                  <span className="flex-1 leading-relaxed">
+                    {renderInlineFormatted(item.content, isAlert)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          );
+        }
+        return null;
+      })}
+    </div>
+  );
+}
 
 export default function App() {
   const [conversations, setConversations] = useState(() => {
@@ -131,6 +255,7 @@ export default function App() {
       const botMessage = {
         sender: 'bot',
         text: data.answer || data.error || 'Maaf, terjadi kesalahan saat merespons.',
+        isOutOfContext: Boolean(data.is_out_of_context),
         contextCount: data.retrieved_context_count,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
@@ -305,7 +430,7 @@ export default function App() {
                   Halo, Siswa Cerdas! 🌱
                 </h1>
                 <p className="text-xs md:text-sm text-gray-500 max-w-sm md:max-w-md mb-6 leading-relaxed">
-                  Tanyakan materi seputar lingkungan, sampah, ekosistem, atau energi sesuai modul PLH kelas VI.
+                  Tanyakan materi seputar Pola Hidup Bersih & Sehat (PHBS) serta Upaya Pelestarian Lingkungan Hidup sesuai modul PLH kelas VI SD/MI.
                 </p>
 
                 {/* Suggestions Grid */}
@@ -332,27 +457,50 @@ export default function App() {
                   }`}
                 >
                   {m.sender === 'bot' && (
-                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+                    <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                      m.isOutOfContext ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                    }`}>
                       <Bot className="w-3.5 h-3.5 md:w-4 md:h-4" />
                     </div>
                   )}
 
-                  <div
-                    className={`max-w-[88%] sm:max-w-[80%] rounded-2xl px-3.5 py-2.5 md:px-4 md:py-3 text-xs md:text-sm leading-relaxed ${
-                      m.sender === 'user'
-                        ? 'bg-gray-100 text-gray-900 rounded-br-xs'
-                        : 'bg-white border border-gray-100 text-gray-800 shadow-2xs'
-                    }`}
-                  >
-                    <div className="whitespace-pre-wrap">{formatCleanText(m.text)}</div>
-
-                    {m.contextCount > 0 && (
-                      <div className="mt-2 pt-1.5 border-t border-gray-100 flex items-center gap-1.5 text-[10px] md:text-[11px] text-gray-400 font-medium">
-                        <BookOpen className="w-3 h-3 text-emerald-600 shrink-0" />
-                        <span>Dirangkum dari {m.contextCount} cuplikan modul</span>
+                  {m.sender === 'user' ? (
+                    <div className="max-w-[88%] sm:max-w-[80%] rounded-2xl px-3.5 py-2.5 md:px-4 md:py-3 text-xs md:text-sm leading-relaxed bg-gray-100 text-gray-900 rounded-br-xs">
+                      <div className="whitespace-pre-wrap">{m.text}</div>
+                    </div>
+                  ) : m.isOutOfContext ? (
+                    /* Tampilan Alert Informatif saat di luar konteks */
+                    <div className="max-w-[90%] sm:max-w-[82%] rounded-2xl px-4 py-3.5 text-xs md:text-sm leading-relaxed bg-amber-50/90 border border-amber-200/90 text-amber-950 shadow-2xs">
+                      {/* Header Alert Informatif */}
+                      <div className="flex items-center gap-1.5 pb-2 mb-2.5 border-b border-amber-200/70 text-amber-900 font-semibold text-xs">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>Pemberitahuan: Pertanyaan di Luar Modul PLH</span>
                       </div>
-                    )}
-                  </div>
+
+                      {/* Isi Pesan Bot dengan format terstruktur */}
+                      <FormattedMessage text={m.text} isAlert={true} />
+
+                      {/* Footer Alert Edukatif */}
+                      <div className="mt-3 pt-2 border-t border-amber-200/70 flex items-start gap-1.5 text-[11px] text-amber-800">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                        <span>
+                          Modul ini memuat <strong>Bab 1 (PHBS)</strong> dan <strong>Bab 2 (Pelestarian Lingkungan Hidup)</strong>. Silakan tanyakan materi terkait ya!
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Tampilan Pesan Normal dalam Konteks dengan Poin-Poin Rapi */
+                    <div className="max-w-[88%] sm:max-w-[82%] rounded-2xl px-3.5 py-3 md:px-4 md:py-3.5 text-xs md:text-sm leading-relaxed bg-white border border-gray-100 text-gray-800 shadow-2xs">
+                      <FormattedMessage text={m.text} isAlert={false} />
+
+                      {m.contextCount > 0 && (
+                        <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center gap-1.5 text-[10px] md:text-[11px] text-emerald-700 font-medium">
+                          <BookOpen className="w-3 h-3 text-emerald-600 shrink-0" />
+                          <span>Sesuai materi Modul PLH (Bab 1 & Bab 2)</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {m.sender === 'user' && (
                     <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center shrink-0 mt-0.5">
@@ -391,7 +539,7 @@ export default function App() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Tanyakan materi PLH..."
+              placeholder="Tanyakan materi seputar PHBS atau Lingkungan Hidup..."
               className="w-full bg-gray-50 hover:bg-gray-100/70 focus:bg-white text-gray-900 text-base md:text-sm rounded-full pl-4 md:pl-5 pr-12 md:pr-14 py-3 md:py-3.5 border border-gray-200 focus:border-emerald-500 focus:outline-hidden transition-all shadow-2xs"
             />
             <button
@@ -404,7 +552,7 @@ export default function App() {
             </button>
           </form>
           <p className="text-[10px] text-gray-400 text-center mt-1.5 truncate px-2">
-            AI merangkum modul PLH. Cross-check dengan buku sekolahmu.
+            AI menjawab sesuai materi Modul PLH (Bab 1 & Bab 2) • Ramah & Edukatif untuk Murid
           </p>
         </div>
       </main>
